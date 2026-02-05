@@ -26,7 +26,7 @@ To design and develop a smart library seat and space management system that enab
 - Alert and penalty mechanisms
 - Admin dashboard for librarians
 
-### Out-of-Scope (Future Development)
+### Out-Scope (Future Development)
 - Book borrowing and return management
 - Facial recognition authentication
 - Full scale IoT sensor deployment
