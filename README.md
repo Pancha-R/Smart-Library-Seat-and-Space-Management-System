@@ -1,4 +1,4 @@
-# Smart-Library-Seat-and-Space-Management-System
+# Smart Library Seat and Space Management System
 With the advancement of digital technologies there is an opportunity to change this  traditional library management practices. This project proposes a smart and technology  driven solution to manage library seating efficiently using QR codes, authentication  mechanisms and real time monitoring.
 
 ## Project Description
@@ -48,3 +48,6 @@ To design and develop a smart library seat and space management system that enab
 This repository is actively maintained throughout the project duration.
 All stages of the project including proposal, requirements analysis, system design, implementation, testing, and documentation are committed regularly 
 According to the ICT 3rd Year Project assessment plan.
+
+## Figma Design
+[Figma Design](https://www.figma.com/design/rYvdCdteke0zH1HzkQZKTD/Smart-Library-Seat-Management?node-id=0-1&t=hYS26BKnYykDWLgS-1)
