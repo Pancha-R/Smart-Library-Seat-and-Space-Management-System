@@ -6,21 +6,30 @@ import {
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 
-export default function LoginScreen({ navigation }) {
+export default function RegisterScreen({ navigation }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [regNumber, setRegNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [retypePassword, setRetypePassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both Email and Password');
+  const handleRegister = () => {
+    if (!name || !email || !regNumber || !password || !retypePassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password !== retypePassword) {
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
     setLoading(true);
     // TODO: replace with real API call
     setTimeout(() => {
       setLoading(false);
-      navigation.replace('Home', { user: { email } });
+      Alert.alert('Success', 'Account created! Please sign in.', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
     }, 1000);
   };
 
@@ -44,47 +53,65 @@ export default function LoginScreen({ navigation }) {
 
         {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Student-Sign In</Text>
-          <Text style={styles.cardSubtitle}>Enter your email and password to login</Text>
+          <Text style={styles.cardTitle}>Student Registration</Text>
 
-          {/* Email */}
+          <Text style={styles.label}>👤  Name</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+          />
+
           <Text style={styles.label}>✉  Email</Text>
           <TextInput
             style={styles.input}
-            placeholder=""
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
 
-          {/* Password */}
+          <Text style={styles.label}>🪪  Registration number</Text>
+          <TextInput
+            style={styles.input}
+            value={regNumber}
+            onChangeText={setRegNumber}
+            autoCapitalize="characters"
+          />
+
           <Text style={styles.label}>🔒  Password</Text>
           <TextInput
             style={styles.input}
-            placeholder=""
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
 
-          {/* Sign In Button */}
+          <Text style={styles.label}>🔒  Retype Password</Text>
+          <TextInput
+            style={styles.input}
+            value={retypePassword}
+            onChangeText={setRetypePassword}
+            secureTextEntry
+          />
+
+          {/* Create Button */}
           <TouchableOpacity
             style={[styles.button, loading && { opacity: 0.7 }]}
-            onPress={handleLogin}
+            onPress={handleRegister}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'SIGNING IN...' : 'SIGN IN'}
+              {loading ? 'CREATING...' : 'CREATE'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Sign Up Link */}
+        {/* Sign In Link */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account ? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.footerLink}>Sign Up</Text>
+          <Text style={styles.footerText}>Already have an account ? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.footerLink}>Sign In</Text>
           </TouchableOpacity>
         </View>
 
@@ -101,25 +128,25 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingTop: 40,
   },
   logoBox: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   logo: {
-    width: 130,
-    height: 130,
-    marginBottom: 10,
+    width: 100,
+    height: 100,
+    marginBottom: 8,
   },
   appName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: COLORS.primary,
     textAlign: 'center',
   },
   university: {
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.text,
     textAlign: 'center',
     marginTop: 2,
@@ -138,12 +165,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: COLORS.textLight,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -176,6 +198,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 20,
+    marginBottom: 20,
   },
   footerText: {
     color: COLORS.text,
