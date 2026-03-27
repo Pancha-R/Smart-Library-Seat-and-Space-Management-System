@@ -9,6 +9,8 @@ import SeatDetailScreen from '../screens/SeatDetailScreen';
 import QRScanScreen from '../screens/QRScanScreen';
 import MyBookingScreen from '../screens/MyBookingScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import ReservationScreen from '../screens/ReservationScreen.js';
+import ProfileScreen from '../screens/ProfileScreen.js';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,6 +25,8 @@ export default function AppNavigator() {
         <Stack.Screen name="QRScan" component={QRScanScreen} />
         <Stack.Screen name="MyBooking" component={MyBookingScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="Reservation" component={ReservationScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -12,16 +12,13 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both Email and Password');
-      return;
-    }
-    setLoading(true);
-    // TODO: replace with real API call
-    setTimeout(() => {
-      setLoading(false);
-      navigation.replace('Home', { user: { email } });
-    }, 1000);
+    navigation.replace('Home', { 
+      user: { 
+        email: 'test@sjp.ac.lk',
+        name: 'L.R.P.P. Rajasekara',
+        regNumber: 'AS2022953',
+      } 
+    });
   };
 
   return (
