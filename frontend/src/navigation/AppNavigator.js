@@ -11,6 +11,7 @@ import MyBookingScreen from '../screens/MyBookingScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ReservationScreen from '../screens/ReservationScreen.js';
 import ProfileScreen from '../screens/ProfileScreen.js';
+import AdminDashboard from '../screens/AdminDashboard';
 
 const Stack = createNativeStackNavigator();
 
@@ -27,6 +28,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Reservation" component={ReservationScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Admin" component={AdminDashboard} />
       </Stack.Navigator>
     </NavigationContainer>
   );
