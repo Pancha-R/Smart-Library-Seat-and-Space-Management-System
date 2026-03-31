@@ -4,16 +4,26 @@ import {
   Modal, Alert, ScrollView,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { cancelReservation } from '../services/api';
 
 export default function SeatDetailScreen({ route, navigation }) {
   const { reservation, user } = route.params;
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     setShowCancelModal(false);
-    Alert.alert('Cancelled', 'Your reservation has been cancelled.', [
-      { text: 'OK', onPress: () => navigation.navigate('Home', { user }) },
-    ]);
+    try {
+      const result = await cancelReservation(reservation.id);
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+      Alert.alert('Cancelled', 'Your reservation has been cancelled.', [
+        { text: 'OK', onPress: () => navigation.replace('Home', { user }) },
+      ]);
+    } catch (err) {
+      Alert.alert('Error', 'Could not cancel. Try again.');
+    }
   };
 
   return (
@@ -32,7 +42,7 @@ export default function SeatDetailScreen({ route, navigation }) {
         <View style={styles.mapBox}>
           <Text style={styles.mapTitle}>{reservation?.floor} Floor Map</Text>
           <View style={styles.deskRow}>
-            {['GE1','GE2','GE3','GE4','GE5'].map(code => (
+            {['GE1', 'GE2', 'GE3', 'GE4', 'GE5'].map(code => (
               <View
                 key={code}
                 style={[

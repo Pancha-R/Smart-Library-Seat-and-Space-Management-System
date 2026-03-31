@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { COLORS } from '../constants/colors';
+import { checkInSeat } from '../services/api';
 
 export default function QRScanScreen({ route, navigation }) {
   const { user, reservation } = route.params || {};
@@ -24,10 +25,23 @@ export default function QRScanScreen({ route, navigation }) {
     );
   }
 
-  const handleBarCodeScanned = ({ data }) => {
+  const handleBarCodeScanned = async ({ data }) => {
     if (!scanned) {
       setScanned(true);
-      setShowResult(true);
+      try {
+        // data from QR code will be the seatCode e.g. "GEA1"
+        const result = await checkInSeat(data);
+        if (result.error) {
+          Alert.alert('Check-in Failed', result.error, [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+          ]);
+          return;
+        }
+        setShowResult(true);
+      } catch (err) {
+        Alert.alert('Error', 'Could not connect to server.');
+        setScanned(false);
+      }
     }
   };
 

@@ -6,6 +6,8 @@ import {
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 
+import { registerUser, saveToken, saveUser } from '../services/api';
+
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -14,9 +16,13 @@ export default function RegisterScreen({ navigation }) {
   const [retypePassword, setRetypePassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!name || !email || !regNumber || !password || !retypePassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (!email.endsWith('@sjp.ac.lk')) {
+      Alert.alert('Error', 'Please use your university email (@sjp.ac.lk)');
       return;
     }
     if (password !== retypePassword) {
@@ -24,13 +30,22 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     setLoading(true);
-    // TODO: replace with real API call
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert('Success', 'Account created! Please sign in.', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
+    try {
+      const result = await registerUser(name, email, regNumber, password);
+      if (result.error) {
+        Alert.alert('Registration Failed', result.error);
+        return;
+      }
+      await saveToken(result.token);
+      await saveUser(result.user);
+      Alert.alert('Success', 'Account created!', [
+        { text: 'OK', onPress: () => navigation.replace('Home', { user: result.user }) },
       ]);
-    }, 1000);
+    } catch (err) {
+      Alert.alert('Error', 'Cannot connect to server.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

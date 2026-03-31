@@ -1,56 +1,116 @@
-// Generate seats as a grid: rows 1-6, columns A-E per floor
-const generateFloorSeats = (floor, floorCode, statusOverrides = {}) => {
-  const rows = [1, 2, 3, 4, 5, 6];
-  const cols = ['E', 'D', 'C', 'B', 'A'];
-  const seats = [];
-  rows.forEach(row => {
-    cols.forEach(col => {
-      const id = `${floorCode}${col}${row}`;
-      const override = statusOverrides[id] || {};
-      seats.push({
-        id,
-        seatCode: `${floorCode}${col}${row}`,
-        col,
-        row,
-        floor,
-        floorCode,
-        status: override.status || 'available',
-        occupiedUntil: override.occupiedUntil || null,
-        reservations: override.reservations || [],
-      });
-    });
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from './config';
+
+// ─── Auth ────────────────────────────────────────────
+
+export const registerUser = async (name, email, regNumber, password) => {
+  const res = await fetch(`${BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, regNumber, password }),
   });
-  return seats;
+  return res.json();
 };
 
-export const mockSeats = [
-  ...generateFloorSeats('Ground', 'GE', {
-    'GEC2': { status: 'occupied', occupiedUntil: '01:00 PM' },
-    'GEB3': { status: 'occupied', occupiedUntil: '02:00 PM' },
-    'GEA1': { status: 'occupied', occupiedUntil: '12:00 PM' },
-    'GED4': { status: 'reserved', reservations: [{ start: '10:00 AM', end: '12:00 PM' }] },
-    'GEC5': { status: 'reserved', reservations: [{ start: '01:00 PM', end: '03:00 PM' }] },
-    'GEE6': { status: 'reserved', reservations: [{ start: '09:00 AM', end: '11:00 AM' }] },
-    'GEB1': { status: 'reserved', reservations: [{ start: '02:00 PM', end: '04:00 PM' }] },
-  }),
-  ...generateFloorSeats('First', 'F1', {
-    'F1C1': { status: 'occupied', occupiedUntil: '03:00 PM' },
-    'F1A3': { status: 'reserved', reservations: [{ start: '11:00 AM', end: '01:00 PM' }] },
-  }),
-  ...generateFloorSeats('Second', 'F2', {}),
-];
+export const loginUser = async (email, password) => {
+  const res = await fetch(`${BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return res.json();
+};
 
-export const mockUser = {
-  name: 'L.R.P.P. Rajasekara',
-  email: 'rajasekara@sjp.ac.lk',
-  regNumber: 'AS2022953',
-  penalties: 1,
-  isBanned: false,
-  currentReservation: {
-    seatCode: 'GE1',
-    floor: 'Ground',
-    start: '01:30 PM',
-    end: '03:00 PM',
-    status: 'confirmed',
-  },
+// ─── Token helpers ───────────────────────────────────
+
+export const saveToken = async (token) => {
+  await AsyncStorage.setItem('token', token);
+};
+
+export const getToken = async () => {
+  return await AsyncStorage.getItem('token');
+};
+
+export const removeToken = async () => {
+  await AsyncStorage.removeItem('token');
+};
+
+export const saveUser = async (user) => {
+  await AsyncStorage.setItem('user', JSON.stringify(user));
+};
+
+export const getUser = async () => {
+  const user = await AsyncStorage.getItem('user');
+  return user ? JSON.parse(user) : null;
+};
+
+export const removeUser = async () => {
+  await AsyncStorage.removeItem('user');
+};
+
+// ─── Seats ───────────────────────────────────────────
+
+export const fetchSeats = async () => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/seats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+};
+
+// ─── Reservations ────────────────────────────────────
+
+export const createReservation = async (data) => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/reservations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+};
+
+export const cancelReservation = async (reservationId) => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/reservations/${reservationId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+};
+
+export const getUserReservation = async () => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/reservations/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+};
+
+// ─── Check-in ────────────────────────────────────────
+
+export const checkInSeat = async (seatCode) => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/checkin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ seatCode }),
+  });
+  return res.json();
+};
+
+// ─── Admin ───────────────────────────────────────────
+
+export const getAdminOverview = async () => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/admin/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
 };

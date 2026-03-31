@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Modal,
+  ScrollView, Modal, ActivityIndicator,
 } from 'react-native';
 import SeatCard from '../components/SeatCard';
 import { COLORS } from '../constants/colors';
-import { mockSeats } from '../services/api';
+import { fetchSeats } from '../services/api';
 
 const FLOORS = ['Ground', 'First', 'Second'];
 const COLS = ['E', 'D', 'C', 'B', 'A'];
@@ -14,18 +14,34 @@ const ROWS = [1, 2, 3, 4, 5, 6];
 export default function HomeScreen({ navigation, route }) {
   const { user } = route.params;
   const [floor, setFloor] = useState('Ground');
+  const [seats, setSeats] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [popupSeat, setPopupSeat] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
 
-  const floorSeats = mockSeats.filter(s => s.floor === floor);
+  useEffect(() => {
+    loadSeats();
+  }, []);
 
-  const getSeat = (row, col) =>
-    floorSeats.find(s => s.row === row && s.col === col);
+  const loadSeats = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchSeats();
+      setSeats(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load seats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const floorSeats = seats.filter(s => s.floor === floor);
+  const getSeat = (row, col) => floorSeats.find(s => s.row === row && s.col === col);
 
   const counts = {
-    available: mockSeats.filter(s => s.status === 'available').length,
-    occupied: mockSeats.filter(s => s.status === 'occupied').length,
-    reserved: mockSeats.filter(s => s.status === 'reserved').length,
+    available: seats.filter(s => s.status === 'available').length,
+    occupied: seats.filter(s => s.status === 'occupied').length,
+    reserved: seats.filter(s => s.status === 'reserved').length,
   };
 
   const handleSeatPress = (seat) => {
@@ -109,13 +125,9 @@ export default function HomeScreen({ navigation, route }) {
 
         {/* Seat Grid Box */}
         <View style={styles.gridBox}>
-
-          {/* Door label */}
           <View style={styles.doorRow}>
             <Text style={styles.doorLabel}>🚪 Door</Text>
           </View>
-
-          {/* Column Headers */}
           <View style={styles.colHeaderRow}>
             <View style={styles.rowNumSpace} />
             {COLS.map(col => (
@@ -124,29 +136,23 @@ export default function HomeScreen({ navigation, route }) {
               </View>
             ))}
           </View>
-
-          {/* Rows */}
-          {ROWS.map(row => (
-            <View key={row} style={styles.seatRow}>
-              {/* Row number */}
-              <Text style={styles.rowNum}>{row}</Text>
-
-              {/* Seats */}
-              {COLS.map(col => {
-                const seat = getSeat(row, col);
-                return seat ? (
-                  <SeatCard
-                    key={seat.id}
-                    seat={seat}
-                    onPress={handleSeatPress}
-                  />
-                ) : (
-                  <View key={`${row}-${col}`} style={styles.emptySeat} />
-                );
-              })}
-            </View>
-          ))}
-
+          {loading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ padding: 40 }} />
+          ) : (
+            ROWS.map(row => (
+              <View key={row} style={styles.seatRow}>
+                <Text style={styles.rowNum}>{row}</Text>
+                {COLS.map(col => {
+                  const seat = getSeat(row, col);
+                  return seat ? (
+                    <SeatCard key={seat.id} seat={seat} onPress={handleSeatPress} />
+                  ) : (
+                    <View key={`${row}-${col}`} style={styles.emptySeat} />
+                  );
+                })}
+              </View>
+            ))
+          )}
           <Text style={styles.hint}>Click on the seat you want to reserve</Text>
         </View>
 
@@ -172,7 +178,6 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.overlay}>
           <View style={styles.modal}>
 
-            {/* OCCUPIED popup */}
             {popupSeat?.status === 'occupied' && (
               <>
                 <Text style={styles.modalIcon}>🔴</Text>
@@ -201,7 +206,6 @@ export default function HomeScreen({ navigation, route }) {
               </>
             )}
 
-            {/* RESERVED popup */}
             {popupSeat?.status === 'reserved' && (
               <>
                 <Text style={styles.modalIcon}>🟠</Text>
@@ -210,7 +214,6 @@ export default function HomeScreen({ navigation, route }) {
                   <Text style={styles.bold}>Seat {popupSeat?.seatCode}</Text> is
                   reserved during these times:
                 </Text>
-
                 {popupSeat?.reservations?.map((r, i) => (
                   <View key={i} style={styles.reservedTimeBox}>
                     <Text style={styles.reservedTimeText}>
@@ -219,11 +222,9 @@ export default function HomeScreen({ navigation, route }) {
                     <Text style={styles.reservedTimeNote}>Not available</Text>
                   </View>
                 ))}
-
                 <Text style={styles.modalSubtext}>
                   You can still reserve this seat at other available times.
                 </Text>
-
                 <View style={styles.modalButtons}>
                   <TouchableOpacity
                     style={[styles.modalBtn, styles.cancelBtn]}
@@ -289,8 +290,6 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },
   legendText: { fontSize: 12, color: COLORS.textLight },
-
-  // Grid
   gridBox: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
@@ -302,82 +301,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  doorRow: {
-    alignItems: 'flex-end',
-    marginBottom: 4,
-    paddingRight: 4,
-  },
+  doorRow: { alignItems: 'flex-end', marginBottom: 4, paddingRight: 4 },
   doorLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    backgroundColor: '#E0E0E0',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 6,
+    fontSize: 12, fontWeight: 'bold', color: COLORS.text,
+    backgroundColor: '#E0E0E0', paddingHorizontal: 10,
+    paddingVertical: 3, borderRadius: 6,
   },
-  colHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
+  colHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   rowNumSpace: { width: 24 },
   colHeader: { width: 44, marginHorizontal: 4, alignItems: 'center' },
   colHeaderText: { fontWeight: 'bold', color: COLORS.textLight, fontSize: 13 },
-  seatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
+  seatRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
   rowNum: {
-    width: 24,
-    fontWeight: 'bold',
-    color: COLORS.textLight,
-    fontSize: 13,
-    textAlign: 'center',
+    width: 24, fontWeight: 'bold',
+    color: COLORS.textLight, fontSize: 13, textAlign: 'center',
   },
   emptySeat: { width: 44, height: 44, margin: 4 },
-  hint: {
-    textAlign: 'center',
-    color: COLORS.textLight,
-    fontSize: 12,
-    marginTop: 10,
-  },
-
-  // Buttons
+  hint: { textAlign: 'center', color: COLORS.textLight, fontSize: 12, marginTop: 10 },
   qrButton: {
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: COLORS.primaryDark, borderRadius: 10,
+    padding: 16, alignItems: 'center', marginBottom: 12,
   },
   qrButtonText: { color: COLORS.white, fontWeight: 'bold', fontSize: 15 },
   bookingButton: {
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    marginBottom: 20,
+    backgroundColor: COLORS.white, borderRadius: 10, padding: 16,
+    alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary, marginBottom: 20,
   },
   bookingButtonText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 15 },
-
-  // Modal
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
   },
-  modal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-  },
+  modal: { backgroundColor: COLORS.white, borderRadius: 16, padding: 24, width: '100%' },
   modalIcon: { fontSize: 36, textAlign: 'center', marginBottom: 8 },
   modalTitle: {
     fontSize: 18, fontWeight: 'bold',
@@ -393,13 +348,9 @@ const styles = StyleSheet.create({
   },
   bold: { fontWeight: 'bold' },
   reservedTimeBox: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#FFF3E0', borderRadius: 8, padding: 10,
+    marginBottom: 8, flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'center',
   },
   reservedTimeText: { fontSize: 14, fontWeight: '600', color: COLORS.text },
   reservedTimeNote: { fontSize: 12, color: COLORS.occupied },

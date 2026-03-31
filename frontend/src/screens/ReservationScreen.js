@@ -4,6 +4,7 @@ import {
   ScrollView, Modal, Alert,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { createReservation } from '../services/api';
 
 const TIME_SLOTS = [
   '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM',
@@ -93,18 +94,27 @@ export default function ReservationScreen({ route, navigation }) {
     setShowConfirmModal(true);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setShowConfirmModal(false);
-    navigation.navigate('Profile', {
-      user,
-      reservation: {
+    try {
+      const result = await createReservation({
+        seatId: seat.seatCode,
         seatCode: seat.seatCode,
         floor: seat.floor,
-        start: startTime,
-        end: endTime,
-        status: 'confirmed',
-      },
-    });
+        startTime,
+        endTime,
+      });
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+      navigation.replace('Profile', {
+        user,
+        reservation: result.reservation,
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Could not create reservation. Try again.');
+    }
   };
 
   return (
