@@ -34,14 +34,14 @@ To design and develop a smart library seat and space management system that enab
 ## Proposed Technology Stack
 - Frontend: React Native
 - Backend: Node.js with Express.js
-- Database: Firebase / MySQL
-- QR Code Integration: Expo QR Scanner / React Native Camera
+- Database: Firebase
+- QR Code Integration: Expo QR Scanner
 
 ## Development Tools
 - Visual Studio Code
 - GitHub (version control)
 - Postman (API testing)
-- Figma / Draw.io (UI & diagrams)
+- Figma (UI & diagrams)
 - Microsoft Word (documentation)
 
 ## Repository Usage
