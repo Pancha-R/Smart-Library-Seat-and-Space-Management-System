@@ -6,6 +6,7 @@ import {
 import SeatCard from '../components/SeatCard';
 import { COLORS } from '../constants/colors';
 import { fetchSeats } from '../services/api';
+import { fetchSeats, getUserReservation } from '../services/api';
 
 const FLOORS = ['Ground', 'First', 'Second'];
 const COLS = ['E', 'D', 'C', 'B', 'A'];
@@ -22,6 +23,13 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     loadSeats();
   }, []);
+
+  useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    loadSeats();
+  });
+  return unsubscribe;
+}, [navigation]);
 
   const loadSeats = async () => {
     setLoading(true);
@@ -44,7 +52,25 @@ export default function HomeScreen({ navigation, route }) {
     reserved: seats.filter(s => s.status === 'reserved').length,
   };
 
-  const handleSeatPress = (seat) => {
+  const handleSeatPress = async (seat) => {
+    // Check if user already has a reservation
+    try {
+      const result = await getUserReservation();
+      if (result?.reservation) {
+        Alert.alert(
+          'Already Reserved',
+          'You already have an active reservation. Please cancel it before making a new one.',
+          [
+            { text: 'View My Reservation', onPress: () => navigation.navigate('Profile', { user }) },
+            { text: 'OK' },
+          ]
+        );
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     if (seat.status === 'available') {
       navigation.navigate('Reservation', { seat, user });
     } else {

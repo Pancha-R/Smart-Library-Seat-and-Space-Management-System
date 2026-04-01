@@ -6,14 +6,19 @@ import {
 import { COLORS } from '../constants/colors';
 import { cancelReservation } from '../services/api';
 
+const COLS = ['E', 'D', 'C', 'B', 'A'];
+const ROWS = [1, 2, 3, 4, 5, 6];
+
 export default function SeatDetailScreen({ route, navigation }) {
   const { reservation, user } = route.params;
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const handleCancel = async () => {
-    setShowCancelModal(false);
+    setCancelling(true);
     try {
       const result = await cancelReservation(reservation.id);
+      setShowCancelModal(false);
       if (result.error) {
         Alert.alert('Error', result.error);
         return;
@@ -23,7 +28,58 @@ export default function SeatDetailScreen({ route, navigation }) {
       ]);
     } catch (err) {
       Alert.alert('Error', 'Could not cancel. Try again.');
+    } finally {
+      setCancelling(false);
     }
+  };
+
+  // Get floor seats grid - highlight reserved seat
+  const renderSeatMap = () => {
+    const floorCode = reservation?.seatCode?.slice(0, 2); // e.g. "GE"
+    return (
+      <View style={styles.mapBox}>
+        <Text style={styles.mapTitle}>{reservation?.floor} Floor Map</Text>
+
+        {/* Column headers */}
+        <View style={styles.colHeaderRow}>
+          <View style={styles.rowNumSpace} />
+          {COLS.map(col => (
+            <View key={col} style={styles.colHeader}>
+              <Text style={styles.colHeaderText}>{col}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Seat grid */}
+        {ROWS.map(row => (
+          <View key={row} style={styles.seatRow}>
+            <Text style={styles.rowNum}>{row}</Text>
+            {COLS.map(col => {
+              const thisSeatCode = `${floorCode}${col}${row}`;
+              const isMyseat = thisSeatCode === reservation?.seatCode;
+              return (
+                <View
+                  key={thisSeatCode}
+                  style={[
+                    styles.miniSeat,
+                    isMyseat && styles.miniSeatActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.miniSeatText,
+                    isMyseat && styles.miniSeatTextActive,
+                  ]}>
+                    {col}{row}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+
+        <Text style={styles.mapNote}>● Your reserved seat is highlighted</Text>
+      </View>
+    );
   };
 
   return (
@@ -38,31 +94,8 @@ export default function SeatDetailScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
 
-        {/* Seat Map Visual */}
-        <View style={styles.mapBox}>
-          <Text style={styles.mapTitle}>{reservation?.floor} Floor Map</Text>
-          <View style={styles.deskRow}>
-            {['GE1', 'GE2', 'GE3', 'GE4', 'GE5'].map(code => (
-              <View
-                key={code}
-                style={[
-                  styles.miniSeat,
-                  code === reservation?.seatCode && styles.miniSeatActive,
-                ]}
-              >
-                <Text style={[
-                  styles.miniSeatText,
-                  code === reservation?.seatCode && styles.miniSeatTextActive,
-                ]}>
-                  {code}
-                </Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.mapNote}>
-            ● Your seat is highlighted
-          </Text>
-        </View>
+        {/* Seat Map */}
+        {renderSeatMap()}
 
         {/* Reservation Info */}
         <View style={styles.detailCard}>
@@ -82,20 +115,36 @@ export default function SeatDetailScreen({ route, navigation }) {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>From</Text>
-            <Text style={styles.detailValue}>{reservation?.start}</Text>
+            <Text style={styles.detailValue}>{reservation?.startTime}</Text>
           </View>
           <View style={styles.divider} />
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Until</Text>
-            <Text style={styles.detailValue}>{reservation?.end}</Text>
+            <Text style={styles.detailValue}>{reservation?.endTime}</Text>
           </View>
           <View style={styles.divider} />
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Status</Text>
-            <View style={styles.confirmedBadge}>
-              <Text style={styles.confirmedText}>CONFIRMED</Text>
+            <View style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  reservation?.status === 'checked-in' ? '#E8F5E9' : '#E3F2FD'
+              }
+            ]}>
+              <Text style={[
+                styles.statusText,
+                {
+                  color:
+                    reservation?.status === 'checked-in'
+                      ? COLORS.available
+                      : COLORS.primary
+                }
+              ]}>
+                {reservation?.status?.toUpperCase()}
+              </Text>
             </View>
           </View>
         </View>
@@ -105,22 +154,24 @@ export default function SeatDetailScreen({ route, navigation }) {
           <Text style={styles.reminderTitle}>⏰ Check-in Reminder</Text>
           <Text style={styles.reminderText}>
             Please check in by scanning the QR code on your desk within{' '}
-            <Text style={styles.bold}>15 minutes</Text> of your reservation
+            <Text style={styles.bold}>30 minutes</Text> of your reservation
             start time to avoid a penalty.
           </Text>
         </View>
 
-        {/* Cancel Button */}
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={() => setShowCancelModal(true)}
-        >
-          <Text style={styles.cancelBtnText}>Cancel Reservation</Text>
-        </TouchableOpacity>
+        {/* Cancel Button - only if not checked in */}
+        {reservation?.status !== 'checked-in' && (
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => setShowCancelModal(true)}
+          >
+            <Text style={styles.cancelBtnText}>Cancel Reservation</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
 
-      {/* Cancel Confirmation Modal */}
+      {/* Cancel Modal */}
       <Modal transparent visible={showCancelModal} animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modal}>
@@ -128,19 +179,24 @@ export default function SeatDetailScreen({ route, navigation }) {
             <Text style={styles.modalText}>
               Are you sure you want to cancel your reservation for{' '}
               <Text style={styles.bold}>Seat {reservation?.seatCode}</Text>?
+              {'\n\n'}The seat will be released immediately.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalBtnKeep]}
                 onPress={() => setShowCancelModal(false)}
+                disabled={cancelling}
               >
                 <Text style={styles.modalBtnKeepText}>Keep It</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalBtnCancel]}
                 onPress={handleCancel}
+                disabled={cancelling}
               >
-                <Text style={styles.modalBtnCancelText}>Yes, Cancel</Text>
+                <Text style={styles.modalBtnCancelText}>
+                  {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -155,103 +211,72 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     backgroundColor: COLORS.primary,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 50, paddingBottom: 16, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   back: { color: COLORS.white, fontSize: 16 },
   headerTitle: { color: COLORS.white, fontSize: 18, fontWeight: 'bold' },
   scroll: { padding: 16 },
   mapBox: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 16,
+    marginBottom: 16, elevation: 3, shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
   },
   mapTitle: { fontSize: 15, fontWeight: 'bold', color: COLORS.text, marginBottom: 12 },
-  deskRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  miniSeat: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#E0E0E0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  colHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  rowNumSpace: { width: 24 },
+  colHeader: { width: 40, marginHorizontal: 3, alignItems: 'center' },
+  colHeaderText: { fontWeight: 'bold', color: COLORS.textLight, fontSize: 12 },
+  seatRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
+  rowNum: {
+    width: 24, fontWeight: 'bold',
+    color: COLORS.textLight, fontSize: 12, textAlign: 'center',
   },
-  miniSeatActive: { backgroundColor: COLORS.primary },
-  miniSeatText: { fontSize: 11, fontWeight: '600', color: COLORS.textLight },
-  miniSeatTextActive: { color: COLORS.white },
-  mapNote: { fontSize: 12, color: COLORS.primary },
+  miniSeat: {
+    width: 40, height: 40, borderRadius: 6,
+    backgroundColor: '#E8F5E9', marginHorizontal: 3,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.available,
+  },
+  miniSeatActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
+  },
+  miniSeatText: { fontSize: 9, fontWeight: '600', color: COLORS.textLight },
+  miniSeatTextActive: { color: COLORS.white, fontSize: 9, fontWeight: 'bold' },
+  mapNote: { fontSize: 12, color: COLORS.primary, marginTop: 10, textAlign: 'center' },
   detailCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 16,
+    marginBottom: 16, elevation: 3, shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
   },
   detailTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginBottom: 12 },
   detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingVertical: 10,
   },
   detailLabel: { fontSize: 14, color: COLORS.textLight },
   detailValue: { fontSize: 14, fontWeight: '600', color: COLORS.text },
   divider: { height: 1, backgroundColor: COLORS.border },
-  confirmedBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  confirmedText: { color: COLORS.available, fontSize: 11, fontWeight: 'bold' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  statusText: { fontSize: 11, fontWeight: 'bold' },
   reminderBox: {
-    borderWidth: 1.5,
-    borderColor: COLORS.reserved,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-    backgroundColor: '#FFF9F0',
+    borderWidth: 1.5, borderColor: COLORS.reserved, borderRadius: 10,
+    padding: 14, marginBottom: 16, backgroundColor: '#FFF9F0',
   },
   reminderTitle: { fontWeight: 'bold', fontSize: 14, marginBottom: 6, color: COLORS.text },
   reminderText: { fontSize: 13, color: COLORS.text, lineHeight: 20 },
   bold: { fontWeight: 'bold' },
   cancelBtn: {
-    borderWidth: 1.5,
-    borderColor: COLORS.occupied,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 30,
+    borderWidth: 1.5, borderColor: COLORS.occupied, borderRadius: 10,
+    padding: 16, alignItems: 'center', marginBottom: 30,
   },
   cancelBtnText: { color: COLORS.occupied, fontWeight: 'bold', fontSize: 15 },
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
   },
-  modal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-  },
+  modal: { backgroundColor: COLORS.white, borderRadius: 16, padding: 24, width: '100%' },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 12 },
   modalText: { fontSize: 14, color: COLORS.text, lineHeight: 22, marginBottom: 20 },
   modalButtons: { flexDirection: 'row', gap: 12 },
