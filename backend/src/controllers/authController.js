@@ -70,6 +70,45 @@ exports.register = async (req, res) => {
   }
 };
 
+// DELETE ACCOUNT
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Check if user has active reservation - cancel it first
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (userData.currentReservationId) {
+      const resDoc = await db.collection('reservations')
+        .doc(userData.currentReservationId).get();
+
+      if (resDoc.exists) {
+        const resData = resDoc.data();
+        // Release the seat
+        await db.collection('seats').doc(resData.seatId).update({
+          status: 'available',
+          occupiedUntil: null,
+          currentReservationId: null,
+        });
+        // Cancel reservation
+        await db.collection('reservations')
+          .doc(userData.currentReservationId).update({
+          status: 'cancelled',
+        });
+      }
+    }
+
+    // Delete user
+    await db.collection('users').doc(userId).delete();
+
+    return res.json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // LOGIN
 exports.login = async (req, res) => {
   try {

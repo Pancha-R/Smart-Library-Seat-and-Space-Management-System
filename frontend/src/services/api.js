@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from './config';
 
-// ─── Auth ────────────────────────────────────────────
+// Auth 
 
 export const registerUser = async (name, email, regNumber, password) => {
   const res = await fetch(`${BASE_URL}/auth/register`, {
@@ -21,7 +21,18 @@ export const loginUser = async (email, password) => {
   return res.json();
 };
 
-// ─── Token helpers ───────────────────────────────────
+// Delete Acc
+
+export const deleteAccount = async () => {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/auth/delete`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+};
+
+// Token helpers
 
 export const saveToken = async (token) => {
   await AsyncStorage.setItem('token', token);
@@ -48,7 +59,7 @@ export const removeUser = async () => {
   await AsyncStorage.removeItem('user');
 };
 
-// ─── Seats ───────────────────────────────────────────
+// Seats 
 
 export const fetchSeats = async () => {
   const token = await getToken();
@@ -58,7 +69,7 @@ export const fetchSeats = async () => {
   return res.json();
 };
 
-// ─── Reservations ────────────────────────────────────
+// Reservations 
 
 export const createReservation = async (data) => {
   const token = await getToken();
@@ -90,7 +101,7 @@ export const getUserReservation = async () => {
   return res.json();
 };
 
-// ─── Check-in ────────────────────────────────────────
+// Check-in 
 
 export const checkInSeat = async (seatCode) => {
   const token = await getToken();
@@ -105,7 +116,7 @@ export const checkInSeat = async (seatCode) => {
   return res.json();
 };
 
-// ─── Admin ───────────────────────────────────────────
+// Admin 
 
 export const getAdminOverview = async () => {
   const token = await getToken();

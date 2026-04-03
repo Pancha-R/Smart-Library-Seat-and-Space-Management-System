@@ -6,6 +6,19 @@ import {
 import { COLORS } from '../constants/colors';
 import { createReservation } from '../services/api';
 
+const getCurrentTimeInMinutes = () => {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+};
+
+const timeSlotToMinutes = (slot) => {
+  const [time, modifier] = slot.split(' ');
+  let [hours, minutes] = time.split(':').map(Number);
+  if (modifier === 'PM' && hours !== 12) hours += 12;
+  if (modifier === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+};
+
 const TIME_SLOTS = [
   '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM',
   '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
@@ -20,34 +33,41 @@ export default function ReservationScreen({ route, navigation }) {
 
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
-  const [showOccupiedModal, setShowOccupiedModal] = useState(
-    seat.status === 'occupied'
-  );
+  const [showOccupiedModal, setShowOccupiedModal] = useState(seat.status === 'occupied');
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Filter available time slots based on seat status
   const getAvailableSlots = () => {
+    const nowMinutes = getCurrentTimeInMinutes();
+    let slots = TIME_SLOTS.filter(slot => timeSlotToMinutes(slot) > nowMinutes);
+
     if (seat.status === 'occupied') {
-      // Only show slots after the occupied time
       const occupiedIndex = TIME_SLOTS.indexOf(seat.occupiedUntil);
-      return TIME_SLOTS.slice(occupiedIndex);
+      if (occupiedIndex !== -1) {
+        const afterOccupied = TIME_SLOTS.slice(occupiedIndex);
+        slots = slots.filter(s => afterOccupied.includes(s));
+      }
     }
+
     if (seat.status === 'reserved') {
-      // Block out reserved slots
       const blocked = [];
-      seat.reservations.forEach(r => {
-        const s = TIME_SLOTS.indexOf(r.start);
-        const e = TIME_SLOTS.indexOf(r.end);
-        for (let i = s; i <= e; i++) blocked.push(TIME_SLOTS[i]);
+      const reservationsList = seat.reservations || [];
+      reservationsList.forEach(r => {
+        const startKey = r.startTime || r.start;
+        const endKey = r.endTime || r.end;
+        const s = TIME_SLOTS.indexOf(startKey);
+        const e = TIME_SLOTS.indexOf(endKey);
+        if (s !== -1 && e !== -1) {
+          for (let i = s; i <= e; i++) blocked.push(TIME_SLOTS[i]);
+        }
       });
-      return TIME_SLOTS.filter(t => !blocked.includes(t));
+      slots = slots.filter(t => !blocked.includes(t));
     }
-    return TIME_SLOTS;
+
+    return slots;
   };
 
   const availableSlots = getAvailableSlots();
-
   const isSlotDisabled = (slot) => !availableSlots.includes(slot);
 
   const handleSlotPress = (slot) => {
@@ -137,19 +157,24 @@ export default function ReservationScreen({ route, navigation }) {
           <Text style={styles.seatFloor}>{seat.floor} Floor</Text>
           <View style={[
             styles.statusBadge,
-            { backgroundColor: seat.status === 'available' ? COLORS.available : seat.status === 'occupied' ? COLORS.occupied : COLORS.reserved }
+            {
+              backgroundColor:
+                seat.status === 'available' ? COLORS.available :
+                seat.status === 'occupied' ? COLORS.occupied :
+                COLORS.reserved
+            }
           ]}>
             <Text style={styles.statusText}>{seat.status.toUpperCase()}</Text>
           </View>
         </View>
 
         {/* Reserved times info */}
-        {seat.status === 'reserved' && seat.reservations.length > 0 && (
+        {seat.status === 'reserved' && seat.reservations?.length > 0 && (
           <View style={styles.infoBox}>
             <Text style={styles.infoTitle}>⚠️ Already Reserved</Text>
             {seat.reservations.map((r, i) => (
               <Text key={i} style={styles.infoText}>
-                {r.start} – {r.end}
+                {r.startTime || r.start} – {r.endTime || r.end}
               </Text>
             ))}
             <Text style={styles.infoSubtext}>
@@ -162,24 +187,31 @@ export default function ReservationScreen({ route, navigation }) {
         {seat.status === 'occupied' && (
           <View style={[styles.infoBox, { borderColor: COLORS.occupied }]}>
             <Text style={styles.infoTitle}>🔴 Currently Occupied</Text>
-            <Text style={styles.infoText}>
-              In use until {seat.occupiedUntil}
-            </Text>
+            <Text style={styles.infoText}>In use until {seat.occupiedUntil}</Text>
             <Text style={styles.infoSubtext}>
               You can only reserve after {seat.occupiedUntil}
             </Text>
           </View>
         )}
 
-        {/* Instructions */}
         <Text style={styles.sectionTitle}>Select Time Slot</Text>
         <Text style={styles.instruction}>
           Tap start time, then tap end time to select your reservation window.
         </Text>
+
         {startTime && (
           <Text style={styles.selectionText}>
             {startTime} {endTime ? `→ ${endTime}` : '→ select end time'}
           </Text>
+        )}
+
+        {/* No slots available message */}
+        {availableSlots.length === 0 && (
+          <View style={styles.noSlotsBox}>
+            <Text style={styles.noSlotsText}>
+              ⚠️ No available time slots for today.
+            </Text>
+          </View>
         )}
 
         {/* Time Slot Grid */}
@@ -218,14 +250,13 @@ export default function ReservationScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Reserve Button */}
         <TouchableOpacity style={styles.reserveBtn} onPress={handleReserve}>
           <Text style={styles.reserveBtnText}>Reserve Seat</Text>
         </TouchableOpacity>
 
       </ScrollView>
 
-      {/* MODAL 1: Occupied seat popup */}
+      {/* MODAL 1: Occupied */}
       <Modal transparent visible={showOccupiedModal} animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modal}>
@@ -259,7 +290,7 @@ export default function ReservationScreen({ route, navigation }) {
             <Text style={styles.modalTitle}>⚠️ Penalty Policy</Text>
             <Text style={styles.modalText}>
               If you do not check in within{' '}
-              <Text style={styles.bold}>15 minutes</Text> after reservation
+              <Text style={styles.bold}>30 minutes</Text> after reservation
               time, your seat will be released and a penalty will be applied.{'\n\n'}
               <Text style={styles.bold}>5 consecutive penalties</Text> will
               temporarily ban your account from the booking system.
@@ -274,7 +305,7 @@ export default function ReservationScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL 3: Confirm Reservation */}
+      {/* MODAL 3: Confirm */}
       <Modal transparent visible={showConfirmModal} animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modal}>
@@ -282,9 +313,7 @@ export default function ReservationScreen({ route, navigation }) {
             <View style={styles.confirmBox}>
               <Text style={styles.confirmSeat}>Seat {seat.seatCode}</Text>
               <Text style={styles.confirmFloor}>{seat.floor} Floor</Text>
-              <Text style={styles.confirmTime}>
-                {startTime} – {endTime}
-              </Text>
+              <Text style={styles.confirmTime}>{startTime} – {endTime}</Text>
             </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -312,44 +341,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     backgroundColor: COLORS.primary,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 50, paddingBottom: 16, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   back: { color: COLORS.white, fontSize: 16 },
   headerTitle: { color: COLORS.white, fontSize: 18, fontWeight: 'bold' },
   scroll: { padding: 16 },
   seatInfoBox: {
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    alignItems: 'center', backgroundColor: COLORS.white,
+    borderRadius: 12, padding: 20, marginBottom: 16, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, shadowRadius: 4,
   },
   seatCode: { fontSize: 36, fontWeight: 'bold', color: COLORS.text },
   seatFloor: { fontSize: 16, color: COLORS.textLight, marginTop: 4 },
-  statusBadge: {
-    marginTop: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
+  statusBadge: { marginTop: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
   statusText: { color: COLORS.white, fontWeight: 'bold', fontSize: 13 },
   infoBox: {
-    borderWidth: 1.5,
-    borderColor: COLORS.reserved,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-    backgroundColor: '#FFF9F0',
+    borderWidth: 1.5, borderColor: COLORS.reserved, borderRadius: 10,
+    padding: 14, marginBottom: 16, backgroundColor: '#FFF9F0',
   },
   infoTitle: { fontWeight: 'bold', fontSize: 15, marginBottom: 6, color: COLORS.text },
   infoText: { fontSize: 14, color: COLORS.text, marginBottom: 2 },
@@ -357,25 +367,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontWeight: 'bold', color: COLORS.text, marginBottom: 6 },
   instruction: { fontSize: 13, color: COLORS.textLight, marginBottom: 8 },
   selectionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginBottom: 12,
-    textAlign: 'center',
+    fontSize: 15, fontWeight: '600', color: COLORS.primary,
+    marginBottom: 12, textAlign: 'center',
   },
+  noSlotsBox: {
+    backgroundColor: '#FFF3E0', borderRadius: 10,
+    padding: 16, alignItems: 'center', marginBottom: 16,
+  },
+  noSlotsText: { color: COLORS.reserved, fontWeight: '600', fontSize: 14 },
   slotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    flexDirection: 'row', flexWrap: 'wrap',
+    justifyContent: 'space-between', marginBottom: 16,
   },
-  slot: {
-    width: '30%',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
+  slot: { width: '30%', padding: 10, borderRadius: 8, marginBottom: 8, alignItems: 'center' },
   slotAvailable: { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: COLORS.available },
   slotSelected: { backgroundColor: COLORS.primary },
   slotInRange: { backgroundColor: '#BBDEFB', borderWidth: 1, borderColor: COLORS.primary },
@@ -383,36 +387,22 @@ const styles = StyleSheet.create({
   slotText: { fontSize: 12, fontWeight: '600', color: COLORS.text },
   slotTextDisabled: { color: '#BDBDBD' },
   slotTextSelected: { color: COLORS.white },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
+  legend: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 20 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },
   legendText: { fontSize: 12, color: COLORS.textLight },
   reserveBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 30,
+    backgroundColor: COLORS.primary, borderRadius: 10,
+    padding: 16, alignItems: 'center', marginBottom: 30,
   },
   reserveBtnText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
   },
   modal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    elevation: 10,
+    backgroundColor: COLORS.white, borderRadius: 16,
+    padding: 24, width: '100%', elevation: 10,
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 12 },
   modalText: { fontSize: 14, color: COLORS.text, lineHeight: 22, marginBottom: 20 },
@@ -424,11 +414,8 @@ const styles = StyleSheet.create({
   modalBtnCancelText: { color: COLORS.text, fontWeight: '600' },
   modalBtnConfirmText: { color: COLORS.white, fontWeight: 'bold' },
   confirmBox: {
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: COLORS.primaryLight, borderRadius: 10,
+    padding: 16, alignItems: 'center', marginBottom: 20,
   },
   confirmSeat: { fontSize: 24, fontWeight: 'bold', color: COLORS.primary },
   confirmFloor: { fontSize: 14, color: COLORS.textLight, marginTop: 4 },

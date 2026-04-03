@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Modal, ActivityIndicator,
+  ScrollView, Modal, ActivityIndicator, Alert,
 } from 'react-native';
 import SeatCard from '../components/SeatCard';
 import { COLORS } from '../constants/colors';
-import { fetchSeats } from '../services/api';
 import { fetchSeats, getUserReservation } from '../services/api';
 
 const FLOORS = ['Ground', 'First', 'Second'];
@@ -25,11 +24,11 @@ export default function HomeScreen({ navigation, route }) {
   }, []);
 
   useEffect(() => {
-  const unsubscribe = navigation.addListener('focus', () => {
-    loadSeats();
-  });
-  return unsubscribe;
-}, [navigation]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadSeats();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadSeats = async () => {
     setLoading(true);
@@ -53,19 +52,42 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleSeatPress = async (seat) => {
-    // Check if user already has a reservation
     try {
       const result = await getUserReservation();
       if (result?.reservation) {
-        Alert.alert(
-          'Already Reserved',
-          'You already have an active reservation. Please cancel it before making a new one.',
-          [
-            { text: 'View My Reservation', onPress: () => navigation.navigate('Profile', { user }) },
-            { text: 'OK' },
-          ]
-        );
-        return;
+        const status = result.reservation.status;
+
+        // If confirmed (not yet checked in) - block new reservation
+        if (status === 'confirmed') {
+          Alert.alert(
+            'Active Reservation',
+            `You have a reserved seat (${result.reservation.seatCode}) that you haven't checked into yet. Please cancel it or scan the QR code to check in first.`,
+            [
+              {
+                text: 'View Reservation',
+                onPress: () => navigation.navigate('Profile', { user })
+              },
+              { text: 'OK' },
+            ]
+          );
+          return;
+        }
+
+        // If already checked in - allow viewing but not new reservation
+        if (status === 'checked-in') {
+          Alert.alert(
+            'Already Seated',
+            `You are currently seated at ${result.reservation.seatCode}. Please release your current seat before making a new reservation.`,
+            [
+              {
+                text: 'View My Seat',
+                onPress: () => navigation.navigate('Profile', { user })
+              },
+              { text: 'OK' },
+            ]
+          );
+          return;
+        }
       }
     } catch (err) {
       console.error(err);

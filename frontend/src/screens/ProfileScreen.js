@@ -4,7 +4,7 @@ import {
   ScrollView, ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
-import { getUserReservation, getUser, removeToken, removeUser } from '../services/api';
+import { getUserReservation, getUser, removeToken, removeUser, deleteAccount } from '../services/api';
 
 export default function ProfileScreen({ route, navigation }) {
   const user = route.params?.user || {};
@@ -31,6 +31,36 @@ export default function ProfileScreen({ route, navigation }) {
     await removeToken();
     await removeUser();
     navigation.replace('Login');
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await deleteAccount();
+              if (result.error) {
+                Alert.alert('Error', result.error);
+                return;
+              }
+              await removeToken();
+              await removeUser();
+              Alert.alert('Deleted', 'Your account has been deleted.', [
+                { text: 'OK', onPress: () => navigation.replace('Login') },
+              ]);
+            } catch (err) {
+              Alert.alert('Error', 'Could not delete account. Try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -117,13 +147,18 @@ export default function ProfileScreen({ route, navigation }) {
             style={styles.qrBtn}
             onPress={() => navigation.navigate('QRScan', { user, reservation })}
           >
-            <Text style={styles.qrBtnText}>📷  Scan QR to Check In</Text>
+            <Text style={styles.qrBtnText}>📷 Scan QR to Check In</Text>
           </TouchableOpacity>
         )}
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+
+        {/* Delete Account */}
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteBtnText}>Delete Account</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -207,4 +242,18 @@ const styles = StyleSheet.create({
     padding: 14, alignItems: 'center', marginBottom: 30,
   },
   logoutText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 15 },
+
+  deleteBtn: {
+  borderWidth: 1.5,
+  borderColor: COLORS.occupied,
+  borderRadius: 10,
+  padding: 14,
+  alignItems: 'center',
+  marginBottom: 30,
+},
+deleteBtnText: {
+  color: COLORS.occupied,
+  fontWeight: 'bold',
+  fontSize: 15,
+},
 });

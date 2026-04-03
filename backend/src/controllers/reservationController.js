@@ -3,7 +3,7 @@ const { db } = require('../firebase');
 // Create reservation
 exports.createReservation = async (req, res) => {
   try {
-    const { seatId, seatCode, floor, startTime, endTime } = req.body;
+    const { seatCode, floor, startTime, endTime } = req.body;
     const userId = req.user.userId;
 
     // Check if user already has active reservation
@@ -11,9 +11,16 @@ exports.createReservation = async (req, res) => {
     const userData = userDoc.data();
 
     if (userData.currentReservationId) {
-      return res.status(400).json({
-        error: 'You already have an active reservation. Cancel it first.',
-      });
+      // Check if current reservation status
+      const currentRes = await db.collection('reservations')
+        .doc(userData.currentReservationId).get();
+
+      if (currentRes.exists && currentRes.data().status === 'confirmed') {
+        return res.status(400).json({
+          error: 'You already have a pending reservation. Cancel it first.',
+        });
+      }
+      // If checked-in, allow future reservations
     }
 
     if (userData.isBanned) {
@@ -22,24 +29,24 @@ exports.createReservation = async (req, res) => {
       });
     }
 
-    // Check seat is available
-    const seatDoc = await db.collection('seats').doc(seatId).get();
+    // Check seat exists using seatCode as document ID
+    const seatDoc = await db.collection('seats').doc(seatCode).get();
     if (!seatDoc.exists) {
       return res.status(404).json({ error: 'Seat not found' });
     }
 
-    // Check for conflicting reservations on same seat
+    // Check for time conflicts on same seat
     const conflicts = await db.collection('reservations')
-      .where('seatId', '==', seatId)
+      .where('seatCode', '==', seatCode)
       .where('status', 'in', ['confirmed', 'checked-in'])
       .get();
 
     for (const doc of conflicts.docs) {
       const r = doc.data();
-      const newStart = new Date(`1970-01-01T${convertTo24(startTime)}`);
-      const newEnd = new Date(`1970-01-01T${convertTo24(endTime)}`);
-      const exStart = new Date(`1970-01-01T${convertTo24(r.startTime)}`);
-      const exEnd = new Date(`1970-01-01T${convertTo24(r.endTime)}`);
+      const newStart = convertToMinutes(startTime);
+      const newEnd = convertToMinutes(endTime);
+      const exStart = convertToMinutes(r.startTime);
+      const exEnd = convertToMinutes(r.endTime);
 
       if (newStart < exEnd && newEnd > exStart) {
         return res.status(400).json({
@@ -51,7 +58,7 @@ exports.createReservation = async (req, res) => {
     // Create reservation
     const reservationRef = await db.collection('reservations').add({
       userId,
-      seatId,
+      seatId: seatCode,
       seatCode,
       floor,
       startTime,
@@ -62,8 +69,8 @@ exports.createReservation = async (req, res) => {
       createdAt: new Date().toISOString(),
     });
 
-    // Update seat status to reserved
-    await db.collection('seats').doc(seatId).update({
+    // Update seat status using seatCode as document ID
+    await db.collection('seats').doc(seatCode).update({
       status: 'reserved',
       currentReservationId: reservationRef.id,
     });
@@ -75,7 +82,6 @@ exports.createReservation = async (req, res) => {
 
     return res.status(201).json({
       message: 'Reservation confirmed!',
-      reservationId: reservationRef.id,
       reservation: {
         id: reservationRef.id,
         seatCode,
@@ -112,8 +118,8 @@ exports.cancelReservation = async (req, res) => {
       status: 'cancelled',
     });
 
-    // Release seat back to available
-    await db.collection('seats').doc(resData.seatId).update({
+    // Release seat using seatCode as document ID
+    await db.collection('seats').doc(resData.seatCode).update({
       status: 'available',
       occupiedUntil: null,
       currentReservationId: null,
@@ -154,11 +160,11 @@ exports.getUserReservation = async (req, res) => {
   }
 };
 
-// Helper: convert "01:30 PM" to "13:30"
-function convertTo24(timeStr) {
+// Helper: convert "01:30 PM" to total minutes
+function convertToMinutes(timeStr) {
   const [time, modifier] = timeStr.split(' ');
-  let [hours, minutes] = time.split(':');
-  if (modifier === 'PM' && hours !== '12') hours = parseInt(hours) + 12;
-  if (modifier === 'AM' && hours === '12') hours = '00';
-  return `${hours}:${minutes}`;
+  let [hours, minutes] = time.split(':').map(Number);
+  if (modifier === 'PM' && hours !== 12) hours += 12;
+  if (modifier === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
 }
